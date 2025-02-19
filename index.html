@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="app.js" defer></script>
+    <style>
+        body {
+            background-color: #000000; /* Black background */
+            color: #ffffff; /* White text */
+        }
+        .container {
+            margin-top: 50px;
+        }
+        .account-card, .trade-card {
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background-color: #001f3f; /* Navy blue background */
+            color: #ffffff; /* White text */
+        }
+        .btn-add-account {
+            background-color: #007bff;
+            color: white;
+        }
+        .status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .status.connected {
+            color: green;
+        }
+        .status.not-connected {
+            color: red;
+        }
+        .status-message {
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .status-message.executing {
+            color: orange;
+        }
+        .status-message.success {
+            color: green;
+        }
+        .status-indicator {
+            display: flex;
+            align-items: center;
+        }
+        .status-indicator .dot {
+            height: 10px;
+            width: 10px;
+            background-color: green;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            color: #ffffff; /* White text */
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-family: 'Arial', sans-serif;
+            font-weight: bold;
+            color:wheat;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TradingBoard</h1>
+    </div>
+    <div id="ws-status" class="status-indicator" style="position: fixed; top: 10px; left: 1000px; background-color: #333; color: white; padding: 5px 10px; border-radius: 5px; font-size: 14px;">
+        <span class="dot" style="background-color: red;"></span>
+        <span>WebSocket Status: Not Connected</span>
+    </div>
+    <div class="container">
+        <h1 class="text-center mb-4">Trading Dashboard</h1>
+
+        <!-- Master and Client Account Input Section in a Row -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card account-card p-3">
+                    <h5>Add Master Account</h5>
+                    <form id="master-form">
+                        <div class="mb-3">
+                            <label for="masterAccountName" class="form-label">Account Name</label>
+                            <input type="text" class="form-control" id="masterAccountName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="masterApiKey" class="form-label">API Key</label>
+                            <input type="text" class="form-control" id="masterApiKey" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="masterSecretKey" class="form-label">Secret Key</label>
+                            <input type="text" class="form-control" id="masterSecretKey" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="masterPassphrase" class="form-label">Passphrase</label>
+                            <input type="text" class="form-control" id="masterPassphrase" required>
+                        </div>
+                        <button type="submit" id="masterSubmit" class="btn btn-add-account">Add Master Account</button>
+                        <p id="masterMessage" class="text-success mt-3" style="display: none;">Master account has been added!</p>
+                    </form>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card account-card p-3">
+                    <h5>Add Client Account</h5>
+                    <form id="client-form">
+                        <div class="mb-3">
+                            <label for="clientAccountName" class="form-label">Account Name</label>
+                            <input type="text" class="form-control" id="clientAccountName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="clientApiKey" class="form-label">API Key</label>
+                            <input type="text" class="form-control" id="clientApiKey" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="clientSecretKey" class="form-label">Secret Key</label>
+                            <input type="text" class="form-control" id="clientSecretKey" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="clientPassphrase" class="form-label">Passphrase</label>
+                            <input type="text" class="form-control" id="clientPassphrase" required>
+                        </div>
+                        <button type="submit" class="btn btn-add-account">Add Client Account</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="card account-card p-3">
+            <h5>Master Account</h5>
+            <ul id="master-account-list" class="list-group"></ul>
+        </div>
+
+        <div class="card account-card p-3">
+            <h5>Client Accounts</h5>
+            <ul id="client-accounts-list" class="list-group"></ul>
+        </div>
+
+        <div class="text-center mt-4">
+            <button id="executeButton" class="btn btn-success">Execute</button>
+            <!-- <p id="executionMessage" class="text-info mt-3" style="display: none;">Execution in progress...</p> -->
+        </div>
+        <br>
+    </div>
+<script>
+    const masterForm = document.getElementById('master-form');
+    const clientForm = document.getElementById('client-form');
+    const accountsList = document.getElementById('accounts-list');
+    const masterTrades = document.getElementById('master-trades');
+    const clientTrades = document.getElementById('client-trades');
+    const masterSubmitButton = document.getElementById('masterSubmit');
+    const masterMessage = document.getElementById('masterMessage');
+    const executeButton = document.getElementById('executeButton');
+    
+    let masterAccountAdded = false;
+    let clientsConnected = 0;
+    let totalClients = 0;
+    let recentTrade = null;
+
+    
+    masterForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const accountName = document.getElementById('masterAccountName').value;
+        const apiKey = document.getElementById('masterApiKey').value;
+        const secretKey = document.getElementById('masterSecretKey').value;
+        const passphrase = document.getElementById('masterPassphrase').value;        
+
+        if (masterAccountAdded) {
+            alert('Master account has already been added.');
+            return;
+        }
+
+        masterAccountAdded = true;
+        masterSubmitButton.disabled = true;
+        masterSubmitButton.classList.add('btn-disabled');
+        masterMessage.style.display = 'block';
+
+        addAccountToList(accountName, apiKey, secretKey, passphrase);
+        masterForm.reset();
+        generateAndDisplayMasterTrade();
+    });
+
+    clientForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const accountName = document.getElementById('clientAccountName').value;
+        const apiKey = document.getElementById('clientApiKey').value;
+        const secretKey = document.getElementById('clientSecretKey').value;
+        const passphrase = document.getElementById('clientPassphrase').value;
+
+        addAccountToList(accountName, apiKey, secretKey, passphrase);
+        clientForm.reset();
+    });
+
+    // Adds account to the list
+    function addAccountToList(accountName, apiKey, secretKey, passphrase) {
+        const accountItem = document.createElement('li');
+        accountItem.className = 'list-group-item d-flex justify-content-between align-items-center account-item';
+
+        accountItem.innerHTML = `
+            <div class="account-details">
+                <strong>Account Name:</strong> ${accountName}
+                <div class="status not-connected" id="status-${apiKey}">Status: Not Connected</div>
+                <div class="balance" id="balance-${apiKey}">Balance: Fetching...</div>
+                <div class="status-message">Waiting for execution...</div>
+            </div>
+            <div>
+                <button class="btn btn-sm btn-danger btn-delete" onclick="deleteAccount(this)">Delete</button>
+            </div>
+        `;
+
+        accountItem.setAttribute('data-apiKey', apiKey);
+        accountItem.setAttribute('data-secretKey', secretKey);
+        accountItem.setAttribute('data-passphrase', passphrase);
+
+        accountsList.appendChild(accountItem);
+
+        totalClients++;
+    }
+
+    // Delete account handler
+    function deleteAccount(button) {
+        const accountItem = button.closest('.list-group-item');
+        accountItem.remove();
+        totalClients--;
+    }
+
+    executeButton.addEventListener('click', function() {
+        executionMessage.style.display = 'block';
+        replicateTradeToClients();
+    });
+</script>
+</body>
+</html>
